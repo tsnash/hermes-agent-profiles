@@ -1,0 +1,23 @@
+# Ignore everything by default
+*
+
+# Allow traversing into subdirectories
+!*/
+
+# Whitelist profile personas
+!**/SOUL.md
+
+# Whitelist custom logic folders (plugins, custom skills)
+!**/plugins/**
+
+# Whitelist manifests and repository metadata
+!.gitignore
+!/README.md
+!engineer/metadata/DISPENSER_MANIFEST.md
+
+# Explicitly re-ignore secrets, runtime noise, and compiled files
+**/__pycache__/
+*.pyc
+**/plugins/**/scan_checkpoint.json
+**/plugins/**/scan_snapshot.json
+**/plugins/**/state.json
