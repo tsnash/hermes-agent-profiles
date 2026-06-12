@@ -18,6 +18,7 @@
 # Explicitly re-ignore secrets, runtime noise, and compiled files
 **/__pycache__/
 *.pyc
+*.env
 **/plugins/**/scan_checkpoint.json
 **/plugins/**/scan_snapshot.json
 **/plugins/**/state.json
