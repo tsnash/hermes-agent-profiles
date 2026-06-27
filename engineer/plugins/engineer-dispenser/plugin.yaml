@@ -1,0 +1,8 @@
+name: engineer-dispenser
+version: 0.1.0
+description: Skills, tools, and hooks that enhance the engineer's ability to carry out tasks.
+provides_tools:
+  - wrench
+  - pda
+provides_hooks:
+  - post_tool_call
