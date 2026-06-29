@@ -1,5 +1,6 @@
 import asyncio
 import importlib.util
+import json
 import sys
 import types
 import unittest
@@ -67,6 +68,47 @@ class TelegramPayloadTests(unittest.TestCase):
             self.assertTrue(any("broadcast failed" in message for message in logs.output))
         finally:
             loop.close()
+
+    def test_generate_tool_summary_uses_structured_success_status(self):
+        class _DummyLLM:
+            def complete(self, messages, max_tokens, purpose):
+                self.messages = messages
+                self.max_tokens = max_tokens
+                self.purpose = purpose
+                return types.SimpleNamespace(text="Done")
+
+        class _DummyCtx:
+            def __init__(self):
+                self.llm = _DummyLLM()
+
+        ctx = _DummyCtx()
+        result = json.dumps({"success": True, "message": "This payload mentions error text but completed successfully"})
+
+        summary = asyncio.run(dispenser._generate_tool_summary(ctx, "wrench", {"action": "test"}, result))
+
+        self.assertEqual(summary, "Done")
+        self.assertIn("SUCCEEDED", ctx.llm.messages[0]["content"])
+        self.assertNotIn("FAILED", ctx.llm.messages[0]["content"])
+
+    def test_generate_tool_summary_treats_plain_text_failures_as_errors(self):
+        class _DummyLLM:
+            def complete(self, messages, max_tokens, purpose):
+                self.messages = messages
+                self.max_tokens = max_tokens
+                self.purpose = purpose
+                return types.SimpleNamespace(text="Done")
+
+        class _DummyCtx:
+            def __init__(self):
+                self.llm = _DummyLLM()
+
+        ctx = _DummyCtx()
+        result = "Something went wrong"
+
+        summary = asyncio.run(dispenser._generate_tool_summary(ctx, "wrench", {"action": "test"}, result))
+
+        self.assertEqual(summary, "⚠️ Done")
+        self.assertIn("FAILED", ctx.llm.messages[0]["content"])
 
 
 if __name__ == "__main__":

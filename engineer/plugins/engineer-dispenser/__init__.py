@@ -28,20 +28,55 @@ def _redact_args(tool_name: str, args: dict) -> dict:
     allowlist = SAFE_ARGS_ALLOWLIST.get(tool_name, set())
     return {k: v for k, v in args.items() if k in allowlist}
 
+
+def _get_tool_result_status(result) -> bool | None:
+    """Extract the tool status from structured result payloads when available."""
+    if isinstance(result, dict):
+        if "success" in result:
+            return bool(result["success"])
+        if "status" in result:
+            status = str(result["status"]).lower()
+            if status in {"success", "ok", "succeeded", "completed"}:
+                return True
+            if status in {"error", "failed", "failure", "exception"}:
+                return False
+        return None
+
+    if isinstance(result, str):
+        try:
+            parsed_result = json.loads(result)
+        except (TypeError, ValueError):
+            return None
+        return _get_tool_result_status(parsed_result)
+
+    return None
+
+
 async def _generate_tool_summary(ctx, tool_name: str, args: dict, result: str) -> str:
     try:
+        status = _get_tool_result_status(result)
+        is_error = False
+        if status is not None:
+            is_error = not status
+        elif isinstance(result, str) and result.strip():
+            is_error = True
+
         # Redact sensitive arguments before building LLM prompt
         safe_args = _redact_args(tool_name, args)
         
         # Map tool name to its schema
         tool_schema = getattr(schemas, tool_name.upper(), {})
         
+        # Adjust prompt based on success or failure
+        status_context = "The tool call FAILED. Mention that it resulted in an error." if is_error else "The tool call SUCCEEDED."
+        
         prompt = (
             f"Write a single brief one-liner summarizing the execution of the tool '{tool_name}'.\n"
             f"Arguments provided: {json.dumps(safe_args, default=str)}\n"
-            f"Tool Schema: {json.dumps(tool_schema, default=str)}\n\n"
-            "Focus ONLY on the action and explicitly reference the parameters that were *required* for this specific action (infer this from the conditional logic in the Tool Schema). "
-            "Do NOT detail or list the result string. Do NOT restate or include the name of the tool in your sentence, as it is already displayed in the message header."
+            f"Tool Schema: {json.dumps(tool_schema, default=str)}\n"
+            f"Status: {status_context}\n\n"
+            "Focus ONLY on the action, explicitly reference the parameters that were *required* for this specific action (infer this from the conditional logic in the Tool Schema), and note if it failed. "
+            "Do NOT detail or list the full result string. Do NOT restate or include the name of the tool in your sentence, as it is already displayed in the message header."
         )
         response = await asyncio.to_thread(
             ctx.llm.complete,
@@ -49,7 +84,13 @@ async def _generate_tool_summary(ctx, tool_name: str, args: dict, result: str) -
             max_tokens=100,
             purpose="hooks.tool-broadcast-summary"
         )
-        return response.text.strip()
+        summary = response.text.strip()
+        
+        # Prepend an alert emoji if it failed
+        if is_error:
+            summary = f"⚠️ {summary}"
+            
+        return summary
     except Exception as e:
         logger.error(f"Failed to generate summary for {tool_name}: {e}")
         return f"Tool {tool_name} executed."
