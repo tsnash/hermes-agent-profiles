@@ -416,12 +416,8 @@ def pda(args: dict, **kwargs) -> str:
             (plugin_dir / "__init__.py").write_text('def register(ctx):\n    pass\n')
             wrench({"action": "register", "name": plugin_name, "path": f"${{HERMES_PROFILES_DIR}}/{profile}/plugins/{plugin_name}"})
             return json.dumps({"success": True, "message": f"Plugin {plugin_name} scaffolded"})
-            content = args.get("content", f"\ndef {item_name}(**kwargs):\n    pass\n")
-            init_content = init_file.read_text()
-            combined_content = init_content + "\n" + content
-            if ("json." in combined_content or "json(" in combined_content) and "import json" not in init_content and "from json" not in init_content:
-                init_file.write_text("import json\n" + init_content)
-            with open(init_file, "a") as f: f.write(f"\n{content}\n")
+        
+        elif resource == "tool" and action == "create":
             item_name = args.get("item_name")
             if not item_name: return json.dumps({"success": False, "error": "item_name required"})
             tools_file = plugin_dir / "tools.py"
@@ -474,3 +470,90 @@ def pda(args: dict, **kwargs) -> str:
 
     except Exception as e:
         return json.dumps({"success": False, "error": str(e)})
+
+def teleporter(args: dict, **kwargs) -> str:
+    """
+    Sends a clarification request asynchronously via a Teleporter to the Home channel.
+    """
+    import urllib.request
+    import urllib.error
+    
+    context_id = args.get("context_id")
+    question = args.get("question")
+    choices = args.get("choices", [])
+
+    if context_id in (None, "") or question in (None, ""):
+        return json.dumps({
+            "success": False,
+            "error": "Missing required arguments: context_id, question"
+        })
+
+    context_id = str(context_id)
+    question = str(question)
+    choices = [str(c) for c in (choices or [])]
+    
+    profile_dir = Path(PROFILES_DIR) / "engineer"
+    env_path = profile_dir / ".env"
+    
+    bot_token = None
+    chat_id = None
+    
+    if env_path.exists():
+        with open(env_path, "r") as f:
+            for line in f:
+                line = line.strip()
+                if line.startswith("TELEGRAM_BOT_TOKEN="):
+                    bot_token = line.split("=", 1)[1].strip().strip('"\'')
+                elif line.startswith("TELEGRAM_HOME_CHANNEL="):
+                    chat_id = line.split("=", 1)[1].strip().strip('"\'')
+                    
+    if not bot_token or not chat_id:
+        return json.dumps({
+            "success": False,
+            "error": "Missing TELEGRAM_BOT_TOKEN or TELEGRAM_HOME_CHANNEL in profile .env"
+        })
+        
+    # Send plain text (no Markdown parsing) and ensure interpolated
+    # fragments are simple strings. This avoids Telegram parsing errors
+    # when content contains control characters or unexpected markup.
+    msg = f"🔧 Teleporter Clarification Request\nContext: {context_id}\n\n{question}"
+    if choices:
+        msg += "\n\nOptions:\n"
+        for idx, c in enumerate(choices, 1):
+            msg += f"{idx}. {c}\n"
+            
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    # No parse_mode: send as plain text to avoid parse failures.
+    payload = {
+        "chat_id": chat_id,
+        "text": msg,
+    }
+    
+    try:
+        req = urllib.request.Request(
+            url, 
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"}
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            if resp.getcode() == 200:
+                return json.dumps({
+                    "success": True,
+                    "message": "Clarification teleported successfully. You should now suspend your work."
+                })
+            else:
+                return json.dumps({
+                    "success": False,
+                    "error": f"Failed with status {resp.getcode()}"
+                })
+    except urllib.error.URLError as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e)
+        })
+    except Exception as e:
+        return json.dumps({
+            "success": False,
+            "error": str(e)
+        })
+

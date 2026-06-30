@@ -157,6 +157,8 @@ def register(ctx):
 
     ctx.register_tool(name="wrench", toolset="engineer-tools", schema=schemas.WRENCH, handler=tools.wrench)
     ctx.register_tool(name="pda", toolset="engineer-tools", schema=schemas.PDA, handler=tools.pda)
+    ctx.register_tool(name="teleporter", toolset="engineer-tools", schema=schemas.TELEPORTER, handler=tools.teleporter)
+
 
     async def _on_post_tool_call_async(event_ctx, tool_name, args, result):
         if tool_name not in ["wrench", "pda"]:

@@ -15,27 +15,28 @@ This manifest tracks the dispenser plugins (tools, skills, and hooks) assigned t
       "path": "${HERMES_PROFILES_DIR}/engineer/plugins/engineer-dispenser",
       "tools": [
         "wrench",
-        "pda"
+        "pda",
+        "teleporter"
       ],
       "hooks": [
-        "_on_post_tool_call"
+        "_on_post_tool_call_sync"
       ],
       "skills": [
         {
+          "name": "teleporter",
+          "associated_tools": ["teleporter"]
+        },
+        {
           "name": "manifest-sync-job",
-          "associated_tools": [
-            "wrench"
-          ]
+          "associated_tools": ["wrench"]
         },
         {
           "name": "dispenser-skill-crafter",
-          "associated_tools": [
-            "pda"
-          ]
+          "associated_tools": ["pda"]
         },
         {
           "name": "dispenser-resource-crafting",
-          "associated_tools": []
+          "associated_tools": ["pda"]
         }
       ],
       "status": "active"

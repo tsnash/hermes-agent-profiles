@@ -152,3 +152,28 @@ PDA = {
         ]
     }
 }
+
+TELEPORTER = {
+    "name": "teleporter",
+    "description": "Send a clarification request asynchronously via a Teleporter to the Home channel. Use this when you are in a background task (e.g. cron/kanban) and need user input. After using this, suspend your work.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "context_id": {
+                "type": "string",
+                "description": "Task ID, job name, or context reference (e.g. 'Task 102')."
+            },
+            "question": {
+                "type": "string",
+                "description": "The clarification question."
+            },
+            "choices": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "Optional list of choices for the user to select from."
+            }
+        },
+        "required": ["context_id", "question"]
+    }
+}
+
